@@ -3,10 +3,9 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    max-width: 80em;
-    min-height: 100vh;
+    width: 80em;
+    height: 100vh;
     box-sizing: border-box;
     margin: auto;
     padding: 1em;
-  }
-  
+}
