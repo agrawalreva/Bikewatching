@@ -12,11 +12,20 @@ const map = new mapboxgl.Map({
   maxZoom: 18
 });
 
+const tooltip = d3.select("body").append("div")
+  .attr("id", "tooltip")
+  .style("position", "absolute")
+  .style("visibility", "hidden")
+  .style("background", "white")
+  .style("padding", "5px")
+  .style("border", "1px solid black")
+  .style("border-radius", "5px")
+  .style("z-index", "1000"); 
+
 map.on('load', async () => {
   const svg = d3.select('#map').select('svg');
     console.log("Map fully loaded!");
 
-    // ✅ Add Boston bike lanes
     map.addSource('boston_route', {
       type: 'geojson',
       data: 'https://bostonopendata-boston.opendata.arcgis.com/datasets/boston::existing-bike-network-2022.geojson'
@@ -33,7 +42,6 @@ map.on('load', async () => {
       }
     });
 
-    // ✅ Add Cambridge bike lanes
     map.addSource('cambridge_routes', {
         type: 'geojson',
         data: 'https://raw.githubusercontent.com/cambridgegis/cambridgegis_data/main/Recreation/Bike_Facilities/RECREATION_BikeFacilities.geojson'
@@ -50,7 +58,6 @@ map.on('load', async () => {
         }
     });
 
-    // ✅ Fetch BlueBike station data
     let jsonData;
     try {
         const jsonurl = "https://dsc106.com/labs/lab07/data/bluebikes-stations.json";
@@ -63,34 +70,67 @@ map.on('load', async () => {
     console.log('Stations Array:', stations);
 
     function getCoords(station) {
-      const point = new mapboxgl.LngLat(+station.lon, +station.lat);  // Convert lon/lat to Mapbox LngLat
-      const { x, y } = map.project(point);  // Project to pixel coordinates
-      return { cx: x, cy: y };  // Return as object for use in SVG attributes
+      const point = new mapboxgl.LngLat(+station.lon, +station.lat); 
+      const { x, y } = map.project(point); 
+      return { cx: x, cy: y }; 
     }
 
-    // ✅ Add station markers as circles
-    const circles = svg.selectAll("circle")
-        .data(stations)
-        .enter()
-        .append("circle")
-        .attr("r", 5) // Circle size
-        .attr("fill", "steelblue")
-        .attr("stroke", "white")
-        .attr("stroke-width", 1)
-        .attr("opacity", 0.8);
+    let trips;
+  try {
+    const csvurl = "https://dsc106.com/labs/lab07/data/bluebikes-traffic-2024-03.csv";
+    trips = await d3.csv(csvurl);
+    console.log('Traffic Data Loaded:', trips.length, 'entries');
+  } catch (error) {
+    console.error('Error loading CSV:', error);
+  }
 
-    // ✅ Update circle positions dynamically
-    function updatePositions() {
-      circles
-          .attr("cx", d => getCoords(d).cx)
-          .attr("cy", d => getCoords(d).cy);
-    }
+  const departures = d3.rollup(trips, v => v.length, d => d.start_station_id);
+  const arrivals = d3.rollup(trips, v => v.length, d => d.end_station_id);
 
-    updatePositions();
-    map.on("move", updatePositions);
-    map.on("zoom", updatePositions);
-    map.on("resize", updatePositions);
-    map.on("moveend", updatePositions);
+  stations = stations.map(station => {
+    let id = station.short_name;
+    station.arrivals = arrivals.get(id) ?? 0;
+    station.departures = departures.get(id) ?? 0;
+    station.totalTraffic = station.arrivals + station.departures;
+    return station;
   });
 
-    // ✅ Convert GPS to pixels
+  const radiusScale = d3.scaleSqrt()
+    .domain([0, d3.max(stations, d => d.totalTraffic)])
+    .range([0, 25]);
+
+
+    const circles = svg.selectAll("circle")
+    .data(stations)
+    .enter()
+    .append("circle")
+    .attr("fill", "steelblue")
+    .attr("stroke", "white")
+    .attr("stroke-width", 1)
+    .attr("fill-opacity", 0.6)
+    .attr("pointer-events", "auto")
+    .on("mouseover", function (event, d) {
+      tooltip.style("visibility", "visible")
+        .text(`${d.totalTraffic} trips (${d.departures} departures, ${d.arrivals} arrivals)`);
+    })
+    .on("mousemove", function (event) {
+      tooltip.style("top", `${event.pageY + 10}px`)
+        .style("left", `${event.pageX + 10}px`);
+    })
+    .on("mouseout", function () {
+      tooltip.style("visibility", "hidden");
+    });
+
+  function updatePositions() {
+    circles
+      .attr("cx", d => getCoords(d).cx)
+      .attr("cy", d => getCoords(d).cy)
+      .attr("r", d => radiusScale(d.totalTraffic));
+  }
+
+  updatePositions();
+  map.on("move", updatePositions);
+  map.on("zoom", updatePositions);
+  map.on("resize", updatePositions);
+  map.on("moveend", updatePositions);
+});
