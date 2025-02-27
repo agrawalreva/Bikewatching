@@ -33,3 +33,37 @@ circle {
     );
     fill: var(--color);
   }
+
+  #map circle,
+  .legend > div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    --color-departures: steelblue;
+--color-arrivals: darkorange;
+--color: color-mix(
+  in oklch,
+  var(--color-departures) calc(100% * var(--departure-ratio)),
+  var(--color-arrivals)
+);
+fill: var(--color);
+  }
+  
+  .legend > div::before {
+    content: "";
+    width: 20px;
+    height: 20px;
+    background-color: var(--color);
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  
+  
