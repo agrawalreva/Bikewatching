@@ -78,6 +78,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let departuresByMinute = Array.from({ length: 1440 }, () => []);
 let arrivalsByMinute = Array.from({ length: 1440 }, () => []);
+let stationFlow = d3.scaleQuantize().domain([0, 1]).range([0, 0.5, 1]);
+
 
 
   map.on('load', async () => {
@@ -160,6 +162,7 @@ let arrivalsByMinute = Array.from({ length: 1440 }, () => []);
       .data(stations, d => d.short_name)
       .enter()
       .append("circle")
+      .style("--departure-ratio", d => stationFlow(d.departures / d.totalTraffic))
       .attr("fill", "steelblue")
       .attr("stroke", "white")
       .attr("stroke-width", 1)
@@ -195,7 +198,8 @@ let arrivalsByMinute = Array.from({ length: 1440 }, () => []);
       radiusScale.range(timeFilter === -1 ? [0, 25] : [3, 50]);
       circles.data(filteredStations, d => d.short_name)
         .join("circle")
-        .attr("r", d => radiusScale(d.totalTraffic));
+        .attr("r", d => radiusScale(d.totalTraffic))
+        .style("--departure-ratio", d => stationFlow(d.departures / d.totalTraffic));
     }
 
     function updateTimeDisplay() {
